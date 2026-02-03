@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALS Algorithm Game (BLS + ALS Secondary Survey)</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#121a2b; --card2:#0f1730; --line:rgba(255,255,255,.10);
+      --text:#eaf0ff; --muted:#9fb0d0;
+      --good:#2ecc71; --bad:#ff5c7a; --warn:#f1c40f; --blue:#4aa3ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#070b14,#0b1220);color:var(--text)}
+    header{padding:16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(7,11,20,.9);backdrop-filter:blur(10px);z-index:5}
+    h1{margin:0;font-size:18px}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.35}
+    main{max-width:1080px;margin:0 auto;padding:16px;display:grid;gap:14px}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
+    @media (max-width:980px){.grid{grid-template-columns:1fr}}
+    .card{background:rgba(18,26,43,.92);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--muted)}
+    .pill b{color:var(--text)}
+    .hr{height:1px;background:var(--line);margin:12px 0}
+    .btn{
+      cursor:pointer;border:1px solid rgba(255,255,255,.14);
+      background:var(--card2);color:var(--text);padding:10px 12px;border-radius:12px;font-weight:700
+    }
+    .btn:hover{filter:brightness(1.08)}
+    .btn.primary{background:linear-gradient(135deg,#2a63ff,#00c2ff);border:none}
+    .btn.ghost{background:transparent}
+    .btn.danger{background:rgba(255,92,122,.14);border-color:rgba(255,92,122,.35)}
+    .btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
+    .badge{display:inline-block;font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.14);color:var(--muted)}
+    .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)} .blue{color:var(--blue)}
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+    .box{background:rgba(15,23,48,.6);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;line-height:1.45}
+    .choices{display:grid;gap:10px;margin-top:10px}
+    .choice{
+      text-align:left; width:100%;
+      padding:12px;border-radius:14px;background:var(--card2);
+      border:1px solid rgba(255,255,255,.12);cursor:pointer;color:var(--text)
+    }
+    .choice:hover{filter:brightness(1.08)}
+    .choice.selected{outline:2px solid rgba(0,194,255,.65)}
+    .choice.correct{border-color:rgba(46,204,113,.7); background:rgba(46,204,113,.10)}
+    .choice.wrong{border-color:rgba(255,92,122,.7); background:rgba(255,92,122,.10)}
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    .kpi .k{border-radius:14px;padding:10px;border:1px solid rgba(255,255,255,.10);background:rgba(15,23,48,.6)}
+    .kpi .n{font-size:18px;font-weight:900}
+    .kpi .l{font-size:12px;color:var(--muted)}
+    .log{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#cfe0ff;white-space:pre-wrap;line-height:1.45;max-height:220px;overflow:auto}
+  </style>
+</head>
+<body>
+<header>
+  <h1>🫀 ALS Algorithm Game</h1>
+  <div class="sub">BLS Primary Survey + ALS Secondary Survey (airway/breathing/circulation + 5Hs/5Ts). OSCE-style branching + team roles. Single-file GitHub Pages.</div>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card">
+      <div class="row">
+        <span class="pill"><b>Role:</b> <span id="roleName">Leader</span></span>
+        <span class="pill"><b>Stage:</b> <span id="stageName">BLS</span></span>
+        <span class="pill"><b>Patient:</b> <span id="ptName">Unresponsive</span></span>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="box" id="caseBox"></div>
+
+      <div class="hr"></div>
+
+      <div id="panel"></div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button class="btn ghost" id="btnBack">⬅ Back</button>
+        <button class="btn" id="btnHint">💡 Hint</button>
+        <button class="btn primary" id="btnCheck">✅ Check</button>
+        <button class="btn primary" id="btnNext" style="display:none">➡ Next</button>
+        <button class="btn danger" id="btnReset">↻ Reset</button>
+      </div>
+
+      <div id="feedback" style="margin-top:10px"></div>
+
+      <details style="margin-top:10px">
+        <summary class="small">Show “Avoid” list (common mistakes)</summary>
+        <div class="small muted" style="margin-top:8px;line-height:1.6">
+          Avoid: prolonged rhythm analysis, taking too long to give breaths, frequent/inappropriate pulse checks, unnecessarily moving the patient. (From your ALS training manual pages shown.) 
+        </div>
+      </details>
+    </section>
+
+    <aside class="card">
+      <div style="font-weight:900">🎯 Scoreboard</div>
+      <div class="muted small">Wrong priorities worsen patient status (OSCE effect).</div>
+
+      <div class="kpi">
+        <div class="k"><div class="n" id="kScore">0</div><div class="l">Score</div></div>
+        <div class="k"><div class="n" id="kSafety">0</div><div class="l">Safety points</div></div>
+        <div class="k"><div class="n" id="kProg">0/0</div><div class="l">Progress</div></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="font-weight:900">👥 Team roles</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" onclick="setRole('Leader')">Leader</button>
+        <button class="btn small" onclick="setRole('Airway')">Airway</button>
+        <button class="btn small" onclick="setRole('Circulation')">Circulation</button>
+        <button class="btn small" onclick="setRole('Scribe')">Scribe</button>
+      </div>
+      <div class="muted small" style="margin-top:8px">Role changes the “focus tip”, but algorithm order stays the same.</div>
+
+      <div class="hr"></div>
+
+      <div style="font-weight:900">🧾 Action log</div>
+      <div class="log" id="log"></div>
+    </aside>
+  </div>
+</main>
+
+<script>
+/* =========================
+   STATE (branching OSCE)
+========================= */
+const S = {
+  role: "Leader",
+  i: 0,
+  selected: new Set(),
+  checked: false,
+  score: 0,
+  safety: 0,
+
+  // Patient status flags
+  status: "Unstable", // Stable / Unstable / Crashing
+  ppeOn: false,
+  helpCalled: false,
+  airwayOpened: false,
+  breathingChecked10s: false,
+  cprStarted: false,
+  defibUsedCorrectly: false,
+
+  advancedAirwayConsidered: false,
+  advancedAirwayConfirmed: false,
+  continuousCPR10bpm: false,
+
+  ivioAccess: false,
+  ecgAttached: false,
+  drugsGiven: false,
+  causesConsidered: false,
+
+  log: []
+};
+
+const el = {
+  roleName: document.getElementById("roleName"),
+  stageName: document.getElementById("stageName"),
+  ptName: document.getElementById("ptName"),
+  caseBox: document.getElementById("caseBox"),
+  panel: document.getElementById("panel"),
+  feedback: document.getElementById("feedback"),
+  btnBack: document.getElementById("btnBack"),
+  btnHint: document.getElementById("btnHint"),
+  btnCheck: document.getElementById("btnCheck"),
+  btnNext: document.getElementById("btnNext"),
+  btnReset: document.getElementById("btnReset"),
+  kScore: document.getElementById("kScore"),
+  kSafety: document.getElementById("kSafety"),
+  kProg: document.getElementById("kProg"),
+  log: document.getElementById("log")
+};
+
+function setRole(r){ S.role=r; log(`Role set: ${r}`); render(); }
+window.setRole = setRole;
+
+/* =========================
+   CONTENT (from your PDF)
+   BLS Primary Survey + ALS Secondary
+========================= */
+const phases = [
+  // BLS PRIMARY SURVEY (Danger → Responsiveness → Airway → Breathing ≤10s → Circulation/CPR → Defib)
+  {
+    id:"danger", stage:"BLS", name:"Danger & PPE",
+    type:"mcq", multi:true,
+    promptTitle:"Scene safety (Danger)",
+    prompt:`You arrive: possible blood spill and sharps on the floor.`,
+    question:`Select the BEST immediate actions.`,
+    hint:`Safety first + wear PPE if available.`,
+    roleTip:{
+      Leader:"Assign safety checks and roles quickly.",
+      Airway:"Don’t start airway until scene is safe.",
+      Circulation:"Prepare AED/defib once safe.",
+      Scribe:"Record time, actions, and hazards."
+    },
+    choices:[
+      {t:"Check for hazards (blood spills/sharps/wires) and ensure scene is safe.", ok:true, why:"Danger check protects rescuer, victim, and bystanders.", eff:{score:+12, set:"ppeOn"}},
+      {t:"Wear PPE (gloves/apron/mask/eye protection) if available.", ok:true, why:"PPE reduces exposure risk during resuscitation.", eff:{score:+10, set:"ppeOn"}},
+      {t:"Immediately start chest compressions before ensuring safety.", ok:false, why:"Unsafe scene risks rescuer injury—safety comes first.", eff:{score:-10, worsen:true}},
+      {t:"Move the patient unnecessarily to a different room first.", ok:false, why:"Avoid unnecessary movement—wastes time and may worsen injury.", eff:{score:-8, worsen:true}}
+    ]
+  },
+  {
+    id:"response", stage:"BLS", name:"Responsiveness & Call for Help",
+    type:"mcq", multi:true,
+    promptTitle:"Responsiveness",
+    prompt:`Patient is lying down, not responding. You tap shoulders and ask loudly.`,
+    question:`What should you do next?`,
+    hint:`Shout for help + call 999 + get AED/defib/trolley.`,
+    roleTip:{
+      Leader:"Direct someone: 'Call 999, bring AED now.'",
+      Airway:"Prepare to open airway after help is called.",
+      Circulation:"Ensure AED/defib is coming.",
+      Scribe:"Note time of collapse and actions."
+    },
+    choices:[
+      {t:"Shout for help and instruct someone to call ambulance (999).", ok:true, why:"Early activation improves response time.", eff:{score:+12, set:"helpCalled"}},
+      {t:"Ask for an AED or bring emergency trolley/defibrillator if available.", ok:true, why:"Early defib is key for shockable rhythms.", eff:{score:+10}},
+      {t:"Wait silently and reassess responsiveness every 2 minutes.", ok:false, why:"Delays care. Activate help immediately.", eff:{score:-10, worsen:true}}
+    ]
+  },
+  {
+    id:"airway", stage:"BLS", name:"Airway (open airway)",
+    type:"mcq", multi:false,
+    promptTitle:"Airway",
+    prompt:`Patient is unresponsive. You need to open the airway.`,
+    question:`Best technique?`,
+    hint:`Head tilt–chin lift; jaw thrust if trauma suspected.`,
+    roleTip:{
+      Leader:"Assign airway to airway nurse; keep flow.",
+      Airway:"Perform head tilt–chin lift; use jaw thrust if trauma suspected.",
+      Circulation:"Prepare compressions if not breathing.",
+      Scribe:"Document airway manoeuvre used."
+    },
+    choices:[
+      {t:"Open airway with head tilt–chin lift (or jaw thrust if trauma suspected).", ok:true, why:"Non-invasive airway opening is first-line in BLS.", eff:{score:+18, set:"airwayOpened"}},
+      {t:"Insert endotracheal tube immediately without assessing breathing.", ok:false, why:"Advanced airway belongs to ALS after BLS primary survey and team availability.", eff:{score:-10, worsen:true}},
+      {t:"Do nothing with airway—go straight to defibrillation.", ok:false, why:"Airway/breathing assessment is required; defib depends on rhythm.", eff:{score:-8}}
+    ]
+  },
+  {
+    id:"breathing", stage:"BLS", name:"Breathing (≤10 seconds)",
+    type:"mcq", multi:false,
+    promptTitle:"Breathing",
+    prompt:`You look for normal breathing.`,
+    question:`How long should breathing assessment take?`,
+    hint:`Not more than 10 seconds.`,
+    roleTip:{
+      Leader:"Remind: limit pauses; don't take too long.",
+      Airway:"Assess breathing quickly while maintaining airway.",
+      Circulation:"Prepare CPR if abnormal breathing/gasps.",
+      Scribe:"Record breathing result."
+    },
+    choices:[
+      {t:"Assess breathing for no more than 10 seconds.", ok:true, why:"Minimises delay to CPR; avoid prolonged checks.", eff:{score:+18, set:"breathingChecked10s"}},
+      {t:"Assess breathing for 30 seconds to be sure.", ok:false, why:"Too long—delays CPR/defib.", eff:{score:-10, worsen:true}},
+      {t:"Skip breathing assessment entirely.", ok:false, why:"Need to identify normal vs abnormal breathing/gasps.", eff:{score:-8}}
+    ]
+  },
+  {
+    id:"circulation", stage:"BLS", name:"Circulation (CPR)",
+    type:"mcq", multi:true,
+    promptTitle:"Circulation",
+    prompt:`You see gasping/abnormal breathing. No normal breathing.`,
+    question:`Select the BEST actions.`,
+    hint:`Start high-quality CPR; pulse check should be simultaneous with breathing assessment (don’t keep stopping).`,
+    roleTip:{
+      Leader:"Command: 'Start CPR now. Minimise interruptions.'",
+      Airway:"Coordinate ventilation with compressions.",
+      Circulation:"High-quality compressions; prepare AED.",
+      Scribe:"Record start CPR time; note interruptions."
+    },
+    choices:[
+      {t:"Start high-quality CPR immediately (compressions first).", ok:true, why:"If not breathing/abnormal breathing, begin CPR until AED arrives.", eff:{score:+15, set:"cprStarted"}},
+      {t:"Do frequent pulse checks every 15 seconds.", ok:false, why:"Avoid frequent/inappropriate pulse checks; interrupts compressions.", eff:{score:-12, worsen:true}},
+      {t:"Minimise interruptions in compressions (aim pauses ≤10s).", ok:true, why:"Interruptions should be limited to no longer than 10 seconds.", eff:{score:+10, safety:+1}},
+      {t:"Take a long time to give breaths and stop compressions repeatedly.", ok:false, why:"Avoid taking too long to give breaths—maintain flow.", eff:{score:-10, worsen:true}}
+    ]
+  },
+  {
+    id:"defib", stage:"BLS", name:"Defibrillation",
+    type:"mcq", multi:false,
+    promptTitle:"Defibrillation",
+    prompt:`AED/defibrillator arrives. Rhythm analysis indicates a shockable rhythm.`,
+    question:`What is the correct action sequence?`,
+    hint:`Shock as indicated, then immediately resume CPR (start with compressions).`,
+    roleTip:{
+      Leader:"Clear the team, deliver shock, restart CPR immediately.",
+      Airway:"Prepare ventilation while compressions resume.",
+      Circulation:"Operate AED/defib, resume compressions right away.",
+      Scribe:"Record shock time, rhythm, CPR resumed time."
+    },
+    choices:[
+      {t:"Deliver shock as indicated, then resume CPR immediately starting with chest compressions.", ok:true, why:"Follow each shock immediately with CPR; minimise interruptions.", eff:{score:+22, set:"defibUsedCorrectly", safety:+1}},
+      {t:"Deliver shock, then recheck pulse for 30 seconds before CPR.", ok:false, why:"Pulse checks cause delay; CPR should resume immediately.", eff:{score:-12, worsen:true}},
+      {t:"Skip shock and continue CPR only.", ok:false, why:"Shockable rhythm requires defibrillation when available.", eff:{score:-10, worsen:true}}
+    ]
+  },
+
+  // ALS SECONDARY SURVEY (Airway/Breathing/Circulation + Differential Dx)
+  {
+    id:"als_airway", stage:"ALS", name:"ALS Secondary — Airway",
+    type:"mcq", multi:true,
+    promptTitle:"ALS Secondary Survey: Airway",
+    prompt:`You continue assessment after BLS. Advanced airway may be needed (SGA/ETT).`,
+    question:`Select correct airway actions.`,
+    hint:`Maintain patency with manoeuvres/OPA/NPA; consider advanced airway if needed.`,
+    roleTip:{
+      Leader:"Balance airway benefit vs interrupting compressions.",
+      Airway:"OPA/NPA, consider SGA/ETT when indicated.",
+      Circulation:"Keep compressions going during airway attempts.",
+      Scribe:"Document airway device and confirmation."
+    },
+    choices:[
+      {t:"Maintain airway patency using head tilt–chin lift/jaw thrust; consider OPA/NPA in unconscious patient.", ok:true, why:"Basic airway maintenance remains essential in ALS.", eff:{score:+12, set:"advancedAirwayConsidered"}},
+      {t:"Use advanced airway (SGA or ETT) if needed.", ok:true, why:"Advanced airway can be used when indicated in ALS.", eff:{score:+10}},
+      {t:"Stop compressions for long periods to attempt intubation repeatedly.", ok:false, why:"Airway benefit must be weighed against interruptions of compressions.", eff:{score:-12, worsen:true}}
+    ]
+  },
+  {
+    id:"als_breathing", stage:"ALS", name:"ALS Secondary — Breathing",
+    type:"mcq", multi:true,
+    promptTitle:"ALS Secondary Survey: Breathing",
+    prompt:`Oxygenation/ventilation must be assessed and monitored (SpO₂, CO₂).`,
+    question:`Select correct breathing actions.`,
+    hint:`Supplementary O2, clinical assessment, SpO₂, capnography; confirm advanced airway placement; if advanced airway used → continuous compressions 100–120/min + 10 breaths/min.`,
+    roleTip:{
+      Leader:"Don’t delay CPR for airway if BVM adequate.",
+      Airway:"Confirm placement, secure tube/device, monitor CO₂ and SpO₂.",
+      Circulation:"Keep compressions continuous if advanced airway placed.",
+      Scribe:"Document confirmation method and ventilation rate."
+    },
+    choices:[
+      {t:"Give supplementary oxygen and assess ventilation clinically + SpO₂ + capnography/capnometry when available.", ok:true, why:"Monitoring oxygenation and CO₂ supports effective ventilation.", eff:{score:+12}},
+      {t:"Confirm advanced airway placement (clinical + capnography) and secure device to prevent dislodgement.", ok:true, why:"Placement confirmation and securing reduce dislodgement and ineffective ventilation.", eff:{score:+10, set:"advancedAirwayConfirmed"}},
+      {t:"After advanced airway: switch to continuous compressions (100–120/min) + ventilation 10 breaths/min.", ok:true, why:"With advanced airway, no more cyclical CPR; continuous compressions with 10 breaths/min.", eff:{score:+12, set:"continuousCPR10bpm", safety:+1}},
+      {t:"Pause compressions every breath to make ventilation easier.", ok:false, why:"Interruptions reduce perfusion; avoid unnecessary pauses.", eff:{score:-12, worsen:true}}
+    ]
+  },
+  {
+    id:"als_circulation", stage:"ALS", name:"ALS Secondary — Circulation",
+    type:"mcq", multi:true,
+    promptTitle:"ALS Secondary Survey: Circulation",
+    prompt:`You need rhythm recognition, access, and drugs if indicated.`,
+    question:`Select correct circulation actions.`,
+    hint:`IV/IO access, attach ECG, give appropriate drugs for rhythm/BP per protocol.`,
+    roleTip:{
+      Leader:"Coordinate rhythm checks quickly; avoid prolonged analysis.",
+      Airway:"Keep oxygenation going while circulation tasks occur.",
+      Circulation:"IV/IO, ECG leads, prepare drugs per protocol.",
+      Scribe:"Document rhythm, shocks, drugs, doses, times."
+    },
+    choices:[
+      {t:"Obtain IV/IO access and give fluids if needed (per protocol).", ok:true, why:"Access supports meds/fluids during resuscitation.", eff:{score:+12, set:"ivioAccess"}},
+      {t:"Attach ECG leads and monitor for arrest rhythms (e.g., VF/pVT/asystole/PEA).", ok:true, why:"Rhythm recognition guides shocks and drugs.", eff:{score:+10, set:"ecgAttached"}},
+      {t:"Give appropriate drugs for rhythm/BP as per local protocol (e.g., adrenaline; antiarrhythmics as indicated).", ok:true, why:"ALS includes medications to support rhythm and blood pressure.", eff:{score:+10, set:"drugsGiven"}},
+      {t:"Spend a long time analysing rhythm while compressions are stopped.", ok:false, why:"Avoid prolonged rhythm analysis; minimise interruptions.", eff:{score:-12, worsen:true}}
+    ]
+  },
+  {
+    id:"als_causes", stage:"ALS", name:"Differential Diagnosis (5Hs & 5Ts)",
+    type:"mcq", multi:true,
+    promptTitle:"Reversible causes",
+    prompt:`While continuing ALS, you search for treatable causes of arrest.`,
+    question:`Select items that belong to 5Hs and 5Ts.`,
+    hint:`5Hs: Hypoxia, Hydrogen ion, Hypothermia, Hypovolemia, Hypo/Hyperkalaemia. 5Ts: Tamponade, Tension pneumothorax, Thrombosis (pulmonary/coronary), Toxins.`,
+    roleTip:{
+      Leader:"Verbalise: 'Treat reversible causes—5Hs and 5Ts.'",
+      Airway:"Hypoxia first: oxygenation and ventilation.",
+      Circulation:"Hypovolemia/Thrombosis/Drugs considerations.",
+      Scribe:"Document suspected cause and actions."
+    },
+    choices:[
+      {t:"Hypoxia", ok:true, why:"Part of 5Hs.", eff:{score:+6}},
+      {t:"Hypovolemia", ok:true, why:"Part of 5Hs.", eff:{score:+6}},
+      {t:"Hypothermia", ok:true, why:"Part of 5Hs.", eff:{score:+6}},
+      {t:"Tension pneumothorax", ok:true, why:"Part of 5Ts.", eff:{score:+6}},
+      {t:"Cardiac tamponade", ok:true, why:"Part of 5Ts.", eff:{score:+6}},
+      {t:"Frequent pulse checks", ok:false, why:"This is on the 'Avoid' list; it interrupts CPR.", eff:{score:-10, worsen:true}}
+    ]
+  },
+
+  { id:"finish", stage:"END", name:"Finish", type:"finish" }
+];
+
+function caseText(){
+  const stage = phases[S.i].stage;
+  const statusBadge = S.status==="Stable" ? `<span class="good"><b>Stable</b></span>` :
+                      S.status==="Crashing" ? `<span class="bad"><b>Crashing</b></span>` :
+                      `<span class="warn"><b>Unstable</b></span>`;
+  const done = [];
+  if(S.helpCalled) done.push("Help called");
+  if(S.airwayOpened) done.push("Airway opened");
+  if(S.breathingChecked10s) done.push("Breathing checked ≤10s");
+  if(S.cprStarted) done.push("CPR started");
+  if(S.defibUsedCorrectly) done.push("Defib + CPR resumed");
+  if(S.ivioAccess) done.push("IV/IO access");
+  if(S.ecgAttached) done.push("ECG attached");
+  if(S.drugsGiven) done.push("Drugs given");
+  if(S.continuousCPR10bpm) done.push("Continuous CPR + 10 bpm ventilation");
+
+  return `
+    <div><b>Scenario:</b> Adult collapse. Patient unresponsive. You are managing BLS then ALS.</div>
+    <div style="margin-top:6px"><b>Current stage:</b> ${stage} • <b>Status:</b> ${statusBadge}</div>
+    <div class="small muted" style="margin-top:8px"><b>Completed:</b> ${done.length ? done.join(" • ") : "—"}</div>
+    <div class="small muted" style="margin-top:6px"><b>OSCE phrase:</b> “I will minimise interruptions in chest compressions and limit pauses to ≤10 seconds.”</div>
+  `;
+}
+
+function worsen(){
+  if(S.status==="Stable") S.status="Unstable";
+  else S.status="Crashing";
+}
+function improve(){
+  // Basic improvement logic: CPR + defib correct improves; repeated bad worsens.
+  if(S.cprStarted && S.defibUsedCorrectly) S.status="Stable";
+}
+
+function applyEff(e){
+  if(!e) return;
+  if(e.score) S.score = Math.max(0, S.score + e.score);
+  if(e.safety) S.safety = Math.max(0, S.safety + e.safety);
+  if(e.worsen) worsen();
+  if(e.set){
+    if(e.set==="ppeOn") S.ppeOn=true;
+    if(e.set==="helpCalled") S.helpCalled=true;
+    if(e.set==="airwayOpened") S.airwayOpened=true;
+    if(e.set==="breathingChecked10s") S.breathingChecked10s=true;
+    if(e.set==="cprStarted") S.cprStarted=true;
+    if(e.set==="defibUsedCorrectly") S.defibUsedCorrectly=true;
+    if(e.set==="advancedAirwayConsidered") S.advancedAirwayConsidered=true;
+    if(e.set==="advancedAirwayConfirmed") S.advancedAirwayConfirmed=true;
+    if(e.set==="continuousCPR10bpm") S.continuousCPR10bpm=true;
+    if(e.set==="ivioAccess") S.ivioAccess=true;
+    if(e.set==="ecgAttached") S.ecgAttached=true;
+    if(e.set==="drugsGiven") S.drugsGiven=true;
+  }
+}
+
+function log(line){
+  const ts = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  S.log.unshift(`[${ts}] ${line}`);
+  if(S.log.length>60) S.log.pop();
+  el.log.textContent = S.log.join("\n");
+}
+
+function updateKPIs(){
+  el.kScore.textContent = S.score;
+  el.kSafety.textContent = S.safety;
+  el.kProg.textContent = `${Math.min(S.i+1, phases.length)}/${phases.length}`;
+  el.ptName.textContent = (S.status==="Stable") ? "Improving" : (S.status==="Crashing" ? "Deteriorating" : "Unstable");
+}
+
+function render(){
+  const P = phases[S.i];
+  el.roleName.textContent = S.role;
+  el.stageName.textContent = P.stage;
+  el.caseBox.innerHTML = caseText();
+  el.feedback.innerHTML = "";
+  S.selected = new Set();
+  S.checked = false;
+  el.btnNext.style.display = "none";
+  el.btnCheck.style.display = (P.type==="finish") ? "none" : "inline-block";
+  el.btnBack.disabled = (S.i===0);
+
+  updateKPIs();
+
+  if(P.type==="mcq") renderMCQ(P);
+  else renderFinish();
+}
+
+function renderMCQ(P){
+  el.panel.innerHTML = `
+    <div style="font-weight:900;font-size:16px">${P.promptTitle}</div>
+    <div class="muted" style="margin-top:6px">${P.prompt}</div>
+    <div style="margin-top:10px;font-weight:800">${P.question}</div>
+    <div class="small muted" style="margin-top:4px">${P.multi ? "Select all that apply." : "Select one option."}</div>
+    <div class="choices" id="choices"></div>
+    <div class="small muted" style="margin-top:10px"><span class="blue"><b>Role focus:</b></span> ${P.roleTip?.[S.role] || "Follow ALS/BLS priorities."}</div>
+  `;
+
+  const choicesWrap = document.getElementById("choices");
+  P.choices.forEach((c, idx)=>{
+    const b = document.createElement("button");
+    b.className = "choice";
+    b.dataset.i = idx;
+    b.innerHTML = `<div style="font-weight:750">${c.t}</div>`;
+    b.addEventListener("click", ()=>{
+      if(S.checked) return;
+      const i = Number(b.dataset.i);
+      if(P.multi){
+        if(S.selected.has(i)) S.selected.delete(i); else S.selected.add(i);
+      } else {
+        S.selected = new Set([i]);
+      }
+      [...document.querySelectorAll(".choice")].forEach(x=>{
+        const j = Number(x.dataset.i);
+        x.classList.toggle("selected", S.selected.has(j));
+      });
+    });
+    choicesWrap.appendChild(b);
+  });
+}
+
+function renderFinish(){
+  const outcome = S.status==="Stable" ? `<span class="good"><b>PASS ✅</b></span>` :
+                  S.status==="Unstable" ? `<span class="warn"><b>BORDERLINE ⚠️</b></span>` :
+                  `<span class="bad"><b>FAIL ❌</b></span>`;
+  el.panel.innerHTML = `
+    <div style="font-weight:900;font-size:16px">Finished</div>
+    <div class="muted" style="margin-top:8px;line-height:1.6">
+      <div><b>Outcome:</b> ${outcome}</div>
+      <div><b>Final score:</b> ${S.score}</div>
+      <div><b>Safety points:</b> ${S.safety}</div>
+      <div style="margin-top:10px">
+        <b>Debrief tip:</b> Say what you avoided: prolonged rhythm analysis, slow breaths, frequent pulse checks, unnecessary movement.
+      </div>
+    </div>
+  `;
+}
+
+function check(){
+  const P = phases[S.i];
+  if(P.type!=="mcq") return;
+  if(S.selected.size===0){
+    el.feedback.innerHTML = `<div class="small muted"><span class="warn"><b>Select an option first.</b></span></div>`;
+    return;
+  }
+  S.checked = true;
+
+  const okSet = new Set(P.choices.map((c,i)=>c.ok?i:null).filter(x=>x!==null));
+  let correct=0, wrong=0, missed=0;
+  S.selected.forEach(i => okSet.has(i) ? correct++ : wrong++);
+  okSet.forEach(i => { if(!S.selected.has(i)) missed++; });
+
+  // Score (OSCE-like)
+  let delta = 0;
+  if(P.multi){
+    delta += correct*10;
+    delta -= wrong*10;
+    delta -= missed*3;
+  } else {
+    const pick = [...S.selected][0];
+    delta += P.choices[pick].ok ? 20 : -10;
+  }
+  S.score = Math.max(0, S.score + delta);
+
+  // Visual marking + apply effects
+  const btns = [...document.querySelectorAll(".choice")];
+  btns.forEach(b=>{
+    const i = Number(b.dataset.i);
+    const chosen = S.selected.has(i);
+    const ok = P.choices[i].ok;
+    b.disabled = true;
+    if(chosen) b.classList.add(ok ? "correct" : "wrong");
+    if(!chosen && ok) b.style.borderColor = "rgba(46,204,113,.35)";
+  });
+
+  S.selected.forEach(i => applyEff(P.choices[i].eff));
+  if(wrong>0) worsen();
+  improve();
+
+  // Rationale
+  let rationale = `<div class="small muted" style="margin-top:8px"><b>Rationales:</b></div><ul class="small" style="margin:8px 0 0;line-height:1.6;color:#dbe7ff">`;
+  P.choices.forEach((c,i)=>{
+    if(S.selected.has(i) || c.ok){
+      const tag = c.ok ? `<span class="good">✔</span>` : `<span class="bad">✘</span>`;
+      rationale += `<li>${tag} ${c.why}</li>`;
+    }
+  });
+  rationale += `</ul>`;
+
+  const verdict = (wrong===0 && missed===0) ? `<div class="good" style="font-weight:900">Correct ✅</div>` : `<div class="warn" style="font-weight:900">Review ⚠️</div>`;
+  const summary = `<div class="small muted">Correct: <b>${correct}</b> • Wrong: <b>${wrong}</b> • Missed: <b>${missed}</b> • Score Δ: <b>${delta}</b> • Status: <b>${S.status}</b></div>`;
+  el.feedback.innerHTML = `${verdict}${summary}${rationale}`;
+
+  log(`${P.name}: Δ${delta} | status=${S.status}`);
+  updateKPIs();
+  el.btnCheck.style.display = "none";
+  el.btnNext.style.display = "inline-block";
+}
+
+function next(){
+  if(S.i < phases.length-1){
+    S.i++;
+    render();
+    log(`Moved to: ${phases[S.i].name}`);
+  }
+}
+
+function back(){
+  if(S.i>0){
+    S.i--;
+    render();
+    log(`Back to: ${phases[S.i].name}`);
+  }
+}
+
+function hint(){
+  const P = phases[S.i];
+  el.feedback.innerHTML = `<div class="small muted"><b>Hint:</b> ${P.hint || "Follow BLS then ALS."}</div>`;
+}
+
+function reset(){
+  Object.assign(S,{
+    role:"Leader", i:0, selected:new Set(), checked:false, score:0, safety:0,
+    status:"Unstable", ppeOn:false, helpCalled:false, airwayOpened:false,
+    breathingChecked10s:false, cprStarted:false, defibUsedCorrectly:false,
+    advancedAirwayConsidered:false, advancedAirwayConfirmed:false, continuousCPR10bpm:false,
+    ivioAccess:false, ecgAttached:false, drugsGiven:false, causesConsidered:false,
+    log:[]
+  });
+  render();
+  log("Game reset.");
+}
+
+el.btnCheck.addEventListener("click", check);
+el.btnNext.addEventListener("click", next);
+el.btnBack.addEventListener("click", back);
+el.btnHint.addEventListener("click", hint);
+el.btnReset.addEventListener("click", reset);
+
+render();
+log("Game started.");
+</script>
+</body>
+</html>
